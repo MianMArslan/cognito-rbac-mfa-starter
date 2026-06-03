@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cognito User Pool with RBAC groups and TOTP MFA
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    AllowedValues: [dev, staging, prod]
+  MfaConfiguration:
+    Type: String
+    Default: OPTIONAL
+    AllowedValues: [OFF, OPTIONAL, ON]
+  EnableSMSMfa:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+  CognitoSNSRoleArn:
+    Type: String
+    Default: ''
+    Description: IAM role ARN for Cognito SMS delivery (leave empty if SMS MFA disabled)
+  WebAppUrl:
+    Type: String
+    Default: 'http://localhost:3000'
+    Description: Frontend URL for OAuth callbacks
+
+Conditions:
+  IsProd: !Equals [!Ref EnvironmentName, 'prod']
+  SMSMfaEnabled: !Equals [!Ref EnableSMSMfa, 'true']
+
+Resources:
+  # ── User Pool ──────────────────────────────────────────────────
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${EnvironmentName}-user-pool'
+      DeletionProtection: !If [IsProd, ACTIVE, INACTIVE]
+
+      # Use email as the login identifier
+      UsernameAttributes: [email]
+      UsernameConfiguration:
+        CaseSensitive: false
+      AutoVerifiedAttributes: [email]
+
+      # MFA
+      MfaConfiguration: !Ref MfaConfiguration
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+        - !If [SMSMfaEnabled, SMS_MFA, !Ref 'AWS::NoValue']
+
+      SmsConfiguration: !If
+        - SMSMfaEnabled
+        - ExternalId: !Sub '${EnvironmentName}-cognito-sms'
+          SnsCallerArn: !Ref CognitoSNSRoleArn
+          SnsRegion: !Ref 'AWS::Region'
+        - !Ref 'AWS::NoValue'
+
+      # Password policy
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 7
+
+      # Account recovery via email
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+
+      # Require email verified before attribute update
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate: [email]
+
+      VerificationMessageTemplate:
+        DefaultEmailOption: CONFIRM_WITH_CODE
+        EmailMessage: 'Your verification code is {####}'
+        EmailSubject: 'Verify your email'
+
+      UserPoolTags:
+        Environment: !Ref EnvironmentName
+        ManagedBy: CloudFormation
+
+  # ── User Pool Client (SPA — no client secret) ──────────────────
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${EnvironmentName}-web-client'
+      UserPoolId: !Ref UserPool
+      GenerateClientSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      CallbackURLs:
+        - !Sub '${WebAppUrl}/api/auth/callback'
+        - 'http://localhost:3000/api/auth/callback'
+      LogoutURLs:
+        - !Sub '${WebAppUrl}/login'
+        - 'http://localhost:3000/login'
+      AllowedOAuthFlows: [code]
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes: [openid, email, profile]
+
+  # ── RBAC Groups ────────────────────────────────────────────────
+  AdminsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Admins
+      UserPoolId: !Ref UserPool
+      Description: Administrators — full access
+      Precedence: 0
+
+  ClientsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Clients
+      UserPoolId: !Ref UserPool
+      Description: Clients — standard access
+      Precedence: 1
+
+Outputs:
+  UserPoolId:
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub '${EnvironmentName}-user-pool-id'
+  UserPoolArn:
+    Value: !GetAtt UserPool.Arn
+    Export:
+      Name: !Sub '${EnvironmentName}-user-pool-arn'
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub '${EnvironmentName}-user-pool-client-id'
+  UserPoolProviderName:
+    Value: !GetAtt UserPool.ProviderName
+    Export:
+      Name: !Sub '${EnvironmentName}-user-pool-provider-name'

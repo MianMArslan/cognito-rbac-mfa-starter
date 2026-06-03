@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS Amplify Hosting for the Next.js frontend
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    AllowedValues: [dev, staging, prod]
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository URL (e.g. https://github.com/username/cognito-rbac-mfa-starter)
+  GitHubBranch:
+    Type: String
+    Default: main
+  GitHubAccessToken:
+    Type: String
+    NoEcho: true
+    Description: GitHub personal access token for Amplify connection
+
+Resources:
+  AmplifyApp:
+    Type: AWS::Amplify::App
+    Properties:
+      Name: !Sub '${EnvironmentName}-web'
+      Repository: !Ref GitHubRepo
+      AccessToken: !Ref GitHubAccessToken
+      BuildSpec: |
+        version: 1
+        applications:
+          - frontend:
+              phases:
+                preBuild:
+                  commands:
+                    - corepack enable
+                    - pnpm install --frozen-lockfile
+                build:
+                  commands:
+                    - pnpm turbo run build --filter=web
+              artifacts:
+                baseDirectory: apps/web/.next
+                files:
+                  - '**/*'
+              cache:
+                paths:
+                  - node_modules/**/*
+                  - apps/web/.next/cache/**/*
+            appRoot: .
+      EnvironmentVariables:
+        - Name: NEXT_PUBLIC_COGNITO_REGION
+          Value: !Ref 'AWS::Region'
+        - Name: NEXT_PUBLIC_COGNITO_USER_POOL_ID
+          Value: !ImportValue
+            Fn::Sub: '${EnvironmentName}-user-pool-id'
+        - Name: NEXT_PUBLIC_COGNITO_CLIENT_ID
+          Value: !ImportValue
+            Fn::Sub: '${EnvironmentName}-user-pool-client-id'
+        - Name: NEXT_PUBLIC_API_URL
+          Value: !Sub
+            - 'http://${AlbDns}'
+            - AlbDns: !ImportValue
+                Fn::Sub: '${EnvironmentName}-alb-dns'
+        - Name: COGNITO_REGION
+          Value: !Ref 'AWS::Region'
+        - Name: COGNITO_USER_POOL_ID
+          Value: !ImportValue
+            Fn::Sub: '${EnvironmentName}-user-pool-id'
+        - Name: COGNITO_CLIENT_ID
+          Value: !ImportValue
+            Fn::Sub: '${EnvironmentName}-user-pool-client-id'
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AmplifyBranch:
+    Type: AWS::Amplify::Branch
+    Properties:
+      AppId: !GetAtt AmplifyApp.AppId
+      BranchName: !Ref GitHubBranch
+      EnableAutoBuild: true
+      Framework: 'Next.js - SSR'
+      Stage: !If
+        - IsProd
+        - PRODUCTION
+        - DEVELOPMENT
+
+Conditions:
+  IsProd: !Equals [!Ref EnvironmentName, 'prod']
+
+Outputs:
+  AmplifyAppId:
+    Value: !GetAtt AmplifyApp.AppId
+    Export:
+      Name: !Sub '${EnvironmentName}-amplify-app-id'
+  AmplifyDefaultDomain:
+    Value: !GetAtt AmplifyApp.DefaultDomain
+    Export:
+      Name: !Sub '${EnvironmentName}-amplify-domain'
