@@ -5,4 +5,8 @@ export class RefreshTokenDto {
   @ApiProperty()
   @IsString()
   refreshToken!: string;
+
+  @ApiProperty()
+  @IsString()
+  username!: string;
 }

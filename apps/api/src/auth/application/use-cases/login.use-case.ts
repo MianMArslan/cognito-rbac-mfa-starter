@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, HttpException, HttpStatus } from '@nestjs/common';
 import { CognitoAuthProvider } from '../../domain/interfaces/cognito-auth-provider.abstract';
 import { AuthTokens } from '@repo/shared-types';
 
@@ -22,14 +22,14 @@ export class LoginUseCase {
 
       return { tokens: result };
     } catch (error: any) {
-      if (
-        error.name === 'NotAuthorizedException' ||
-        error.name === 'UserNotFoundException'
-      ) {
+      if (error.name === 'NotAuthorizedException' || error.name === 'UserNotFoundException') {
         throw new UnauthorizedException('Invalid email or password');
       }
       if (error.name === 'UserNotConfirmedException') {
-        throw new UnauthorizedException('Please verify your email before logging in');
+        throw new HttpException(
+          { message: 'Email not verified', errorCode: 'EMAIL_NOT_CONFIRMED' },
+          HttpStatus.FORBIDDEN,
+        );
       }
       throw error;
     }

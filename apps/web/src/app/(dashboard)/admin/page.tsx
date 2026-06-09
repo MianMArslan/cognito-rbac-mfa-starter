@@ -1,28 +1,36 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
-import { cookies } from 'next/headers';
-import { apiClient } from '@/lib/api-client';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 import type { AuthenticatedUser } from '@repo/shared-types';
 import { Users, ShieldAlert, UserCheck, UserCog } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
-export default async function AdminPage() {
-  const user = await getSession();
-  if (!user) redirect('/login');
-  if (user.role !== 'ADMIN') redirect('/dashboard');
+export default function AdminPage() {
+  const router = useRouter();
+  const { user, accessToken, isLoading } = useAuth();
+  const [users, setUsers] = useState<AuthenticatedUser[]>([]);
 
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get('access_token')?.value;
+  useEffect(() => {
+    if (!isLoading && user && user.role !== 'ADMIN') {
+      router.replace('/dashboard');
+    }
+  }, [isLoading, user, router]);
 
-  let users: AuthenticatedUser[] = [];
-  try {
-    const res = await apiClient.get<AuthenticatedUser[]>('/users', accessToken);
-    users = res.data ?? [];
-  } catch {
-    users = [];
-  }
+  useEffect(() => {
+    if (!accessToken || !user || user.role !== 'ADMIN') return;
+    fetch('/api/users', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((r) => r.json())
+      .then((d) => setUsers(d.data ?? []))
+      .catch(() => {});
+  }, [accessToken, user]);
+
+  if (isLoading || !user || user.role !== 'ADMIN') return null;
 
   const adminCount = users.filter((u) => u.role === 'ADMIN').length;
   const clientCount = users.filter((u) => u.role === 'CLIENT').length;

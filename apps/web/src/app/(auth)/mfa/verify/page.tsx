@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
+import { saveSession } from '@/lib/session';
 
 const schema = z.object({ code: z.string().length(6, 'Enter the 6-digit code') });
 type FormValues = z.infer<typeof schema>;
@@ -34,6 +35,8 @@ function MfaVerifyForm() {
       body: JSON.stringify({ session, username, code: values.code }),
     });
     if (!res.ok) { const d = await res.json(); setError(d.message ?? 'Invalid code.'); return; }
+    const data = await res.json();
+    saveSession({ idToken: data.idToken, accessToken: data.accessToken, refreshToken: data.refreshToken });
     router.push('/dashboard');
   };
 

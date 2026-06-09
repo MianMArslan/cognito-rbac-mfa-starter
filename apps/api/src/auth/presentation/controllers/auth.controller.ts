@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../../infrastructure/guards/jwt-auth.guard';
 import { RegisterDto } from '../dtos/register.dto';
 import { LoginDto } from '../dtos/login.dto';
 import { RefreshTokenDto } from '../dtos/refresh-token.dto';
+import { ConfirmSignUpDto } from '../dtos/confirm-signup.dto';
 import { ForgotPasswordDto } from '../dtos/forgot-password.dto';
 import { VerifyMfaChallengeDto, VerifyMfaSetupDto } from '../dtos/verify-mfa.dto';
 import { AuthenticatedUser } from '@repo/shared-types';
@@ -37,7 +38,23 @@ export class AuthController {
   @ApiOperation({ summary: 'Register a new account' })
   async registerUser(@Body() dto: RegisterDto) {
     await this.register.execute(dto.email, dto.password);
-    return { success: true, message: 'Account created. Please check your email to verify.' };
+    return { success: true, message: 'Account created. Please check your email for a verification code.' };
+  }
+
+  @Post('confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm account with emailed verification code' })
+  async confirmUser(@Body() dto: ConfirmSignUpDto) {
+    await this.authProvider.confirmSignUp(dto.email, dto.code);
+    return { success: true, message: 'Account confirmed. You can now sign in.' };
+  }
+
+  @Post('resend-confirmation')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend email verification code' })
+  async resendConfirmation(@Body() dto: ForgotPasswordDto) {
+    await this.authProvider.resendConfirmationCode(dto.email);
+    return { success: true };
   }
 
   @Post('login')
@@ -57,7 +74,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
   async refreshToken(@Body() dto: RefreshTokenDto) {
-    const tokens = await this.authProvider.refreshTokens(dto.refreshToken);
+    const tokens = await this.authProvider.refreshTokens(dto.refreshToken, dto.username);
     return { success: true, ...tokens };
   }
 

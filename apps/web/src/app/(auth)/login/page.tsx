@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { saveSession } from '@/lib/session';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -37,11 +38,24 @@ export default function LoginPage() {
         body: JSON.stringify(values),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.message ?? 'Invalid email or password'); return; }
+      if (!res.ok) {
+        if (data.errorCode === 'EMAIL_NOT_CONFIRMED') {
+          await fetch('/api/auth/resend-confirmation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: values.email }),
+          });
+          router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+          return;
+        }
+        setError(data.message ?? 'Invalid email or password');
+        return;
+      }
       if (data.mfaRequired) {
         router.push(`/mfa/verify?session=${data.session}&username=${encodeURIComponent(values.email)}`);
         return;
       }
+      saveSession({ idToken: data.idToken, accessToken: data.accessToken, refreshToken: data.refreshToken });
       router.push('/dashboard');
     } catch {
       setError('Something went wrong. Please try again.');

@@ -4,6 +4,8 @@ import {
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
   SignUpCommand,
+  ConfirmSignUpCommand,
+  ResendConfirmationCodeCommand,
   GlobalSignOutCommand,
   AssociateSoftwareTokenCommand,
   VerifySoftwareTokenCommand,
@@ -22,13 +24,23 @@ import * as crypto from 'crypto';
 export class CognitoAuthProviderImpl extends CognitoAuthProvider {
   private readonly client: CognitoIdentityProviderClient;
   private readonly clientId: string;
+  private readonly clientSecret: string | undefined;
 
   constructor(private readonly config: ConfigService) {
     super();
     this.clientId = this.config.getOrThrow<string>('COGNITO_CLIENT_ID');
+    this.clientSecret = this.config.get<string>('COGNITO_CLIENT_SECRET');
     this.client = new CognitoIdentityProviderClient({
       region: this.config.getOrThrow<string>('COGNITO_REGION'),
     });
+  }
+
+  private computeSecretHash(username: string): string | undefined {
+    if (!this.clientSecret) return undefined;
+    return crypto
+      .createHmac('sha256', this.clientSecret)
+      .update(username + this.clientId)
+      .digest('base64');
   }
 
   async signUp(email: string, password: string): Promise<void> {
@@ -38,6 +50,7 @@ export class CognitoAuthProviderImpl extends CognitoAuthProvider {
         Username: email,
         Password: password,
         UserAttributes: [{ Name: 'email', Value: email }],
+        SecretHash: this.computeSecretHash(email),
       }),
     );
   }
@@ -53,6 +66,7 @@ export class CognitoAuthProviderImpl extends CognitoAuthProvider {
         AuthParameters: {
           USERNAME: email,
           PASSWORD: password,
+          ...(this.computeSecretHash(email) && { SECRET_HASH: this.computeSecretHash(email) }),
         },
       }),
     );
@@ -71,12 +85,15 @@ export class CognitoAuthProviderImpl extends CognitoAuthProvider {
     return this.mapAuthResult(response.AuthenticationResult);
   }
 
-  async refreshTokens(refreshToken: string): Promise<AuthTokens> {
+  async refreshTokens(refreshToken: string, username: string): Promise<AuthTokens> {
     const response = await this.client.send(
       new InitiateAuthCommand({
         AuthFlow: AuthFlowType.REFRESH_TOKEN_AUTH,
         ClientId: this.clientId,
-        AuthParameters: { REFRESH_TOKEN: refreshToken },
+        AuthParameters: {
+          REFRESH_TOKEN: refreshToken,
+          ...(this.computeSecretHash(username) && { SECRET_HASH: this.computeSecretHash(username) }),
+        },
       }),
     );
 
@@ -144,6 +161,7 @@ export class CognitoAuthProviderImpl extends CognitoAuthProvider {
         ChallengeResponses: {
           USERNAME: username,
           SOFTWARE_TOKEN_MFA_CODE: code,
+          ...(this.computeSecretHash(username) && { SECRET_HASH: this.computeSecretHash(username) }),
         },
       }),
     );
@@ -164,11 +182,33 @@ export class CognitoAuthProviderImpl extends CognitoAuthProvider {
     );
   }
 
+  async resendConfirmationCode(email: string): Promise<void> {
+    await this.client.send(
+      new ResendConfirmationCodeCommand({
+        ClientId: this.clientId,
+        Username: email,
+        SecretHash: this.computeSecretHash(email),
+      }),
+    );
+  }
+
+  async confirmSignUp(email: string, code: string): Promise<void> {
+    await this.client.send(
+      new ConfirmSignUpCommand({
+        ClientId: this.clientId,
+        Username: email,
+        ConfirmationCode: code,
+        SecretHash: this.computeSecretHash(email),
+      }),
+    );
+  }
+
   async forgotPassword(email: string): Promise<void> {
     await this.client.send(
       new ForgotPasswordCommand({
         ClientId: this.clientId,
         Username: email,
+        SecretHash: this.computeSecretHash(email),
       }),
     );
   }

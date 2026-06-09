@@ -5,14 +5,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 export async function POST(request: NextRequest) {
   const body = await request.json();
 
-  if (!body.refreshToken) {
-    return NextResponse.json({ message: 'No refresh token' }, { status: 401 });
-  }
-
-  const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+  const res = await fetch(`${API_URL}/api/v1/auth/resend-confirmation`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken: body.refreshToken }),
+    body: JSON.stringify(body),
   });
 
   const data = await res.json();

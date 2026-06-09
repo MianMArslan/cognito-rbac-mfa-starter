@@ -1,13 +1,16 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
+'use client';
+
+import { useAuth } from '@/hooks/use-auth';
 import { ShieldCheck, Tag, KeyRound, User, Fingerprint } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-export default async function DashboardPage() {
-  const user = await getSession();
-  if (!user) redirect('/login');
+export default function DashboardPage() {
+  const { user, isLoading } = useAuth();
+
+  // Layout handles redirect and loading spinner — just bail here
+  if (isLoading || !user) return null;
 
   const stats = [
     {

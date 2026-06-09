@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { getAccessToken } from '@/lib/session';
 
 const schema = z.object({ code: z.string().length(6, 'Enter the 6-digit code') });
 type FormValues = z.infer<typeof schema>;
@@ -29,7 +30,11 @@ export default function MfaSetupPage() {
   });
 
   useEffect(() => {
-    fetch('/api/auth/mfa/setup', { method: 'POST' })
+    const token = getAccessToken();
+    fetch('/api/auth/mfa/setup', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then((r) => r.json())
       .then((d) => { setQrCodeUrl(d.data?.qrCodeUrl ?? null); setSecretCode(d.data?.secretCode ?? null); })
       .catch(() => setError('Failed to generate MFA setup. Please refresh and try again.'));
@@ -44,9 +49,13 @@ export default function MfaSetupPage() {
 
   const onSubmit = async (values: FormValues) => {
     setError(null);
+    const token = getAccessToken();
     const res = await fetch('/api/auth/mfa/verify-setup', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ code: values.code }),
     });
     if (!res.ok) { const d = await res.json(); setError(d.message ?? 'Invalid code.'); return; }

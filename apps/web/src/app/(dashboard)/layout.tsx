@@ -1,14 +1,31 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 import Link from 'next/link';
-import { ShieldCheck, LayoutDashboard, Settings, Users, LogOut } from 'lucide-react';
+import { ShieldCheck, LayoutDashboard, Settings, Users, LogOut, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = await getSession();
-  if (!user) redirect('/login');
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { user, isLoading, logout } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace('/login');
+    }
+  }, [isLoading, user, router]);
+
+  if (isLoading || !user) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   const nav = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -68,15 +85,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 {user.role}
               </Badge>
             </div>
-            <form action="/api/auth/logout" method="POST">
-              <button
-                type="submit"
-                title="Sign out"
-                className="text-sidebar-foreground/30 hover:text-sidebar-foreground transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            </form>
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="text-sidebar-foreground/30 hover:text-sidebar-foreground transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </aside>
