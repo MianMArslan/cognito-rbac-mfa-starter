@@ -1,6 +1,6 @@
 # cognito-rbac-mfa-starter
 
-A production-grade, full-stack starter kit for AWS Cognito authentication with **Role-Based Access Control (RBAC)** and **Multi-Factor Authentication (MFA)**. Built as a Turborepo monorepo with **Next.js 14** (App Router) frontend, **NestJS** backend, and **CloudFormation** infrastructure — with SOLID principles applied throughout.
+A production-grade, full-stack starter kit for AWS Cognito authentication with **Role-Based Access Control (RBAC)** and **Multi-Factor Authentication (MFA)**. Built as a Turborepo monorepo with **Next.js 14** (App Router) frontend and **NestJS** backend.
 
 ---
 
@@ -13,22 +13,21 @@ A production-grade, full-stack starter kit for AWS Cognito authentication with *
                             │ HTTPS
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              AWS Amplify Hosting (Next.js SSR)                  │
+│                   Next.js 14 (port 3000)                        │
 │  ┌─────────────────────┐   ┌──────────────────────────────────┐ │
 │  │  App Router Pages   │   │  API Routes /api/auth/*          │ │
-│  │  - /login           │   │  (proxy to NestJS, set cookies)  │ │
+│  │  - /login           │   │  (proxy to NestJS)               │ │
 │  │  - /dashboard       │   └──────────────────────────────────┘ │
 │  │  - /admin (ADMIN)   │                                        │
-│  │  - /mfa/setup       │   middleware.ts (jose JWT verify)      │
+│  │  - /settings        │                                        │
 │  └─────────────────────┘                                        │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ HTTP (Bearer token)
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│            ALB  →  ECS Fargate (NestJS API :4000)               │
+│                    NestJS API (port 4000)                       │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │  AuthModule   UsersModule   RolesModule   HealthController │ │
-│  │  (SOLID Clean Architecture — see below)                    │ │
+│  │       AuthModule   UsersModule   HealthController          │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ AWS SDK v3
@@ -36,8 +35,8 @@ A production-grade, full-stack starter kit for AWS Cognito authentication with *
 ┌─────────────────────────────────────────────────────────────────┐
 │                    AWS Cognito User Pool                        │
 │  ┌──────────┐  ┌──────────────┐  ┌──────────────────────────┐   │
-│  │  Admins  │  │   Clients    │  │  TOTP MFA (optional SMS) │   │
-│  │ group    │  │   group      │  │  cognito:groups in JWT   │   │
+│  │  Admins  │  │   Clients    │  │      TOTP MFA            │   │
+│  │  group   │  │   group      │  │  cognito:groups in JWT   │   │
 │  └──────────┘  └──────────────┘  └──────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -55,7 +54,6 @@ A production-grade, full-stack starter kit for AWS Cognito authentication with *
 | **Session**        | HTTP-only cookies (access, id, refresh tokens)                 |
 | **Frontend**       | Next.js 14 App Router, middleware auth guard, role-gated pages |
 | **Backend**        | NestJS with SOLID principles, Swagger docs at `/api/docs`      |
-| **IaC**            | CloudFormation nested stacks — Cognito, IAM, ECR, ECS, Amplify |
 | **Monorepo**       | Turborepo with pnpm workspaces, shared types package           |
 
 ---
@@ -84,15 +82,6 @@ cognito-rbac-mfa-starter/
 │   ├── shared-types/               # @repo/shared-types — UserRole, AuthTokens, etc.
 │   ├── eslint-config/              # @repo/eslint-config
 │   └── typescript-config/          # @repo/typescript-config
-├── infra/
-│   ├── cloudformation/
-│   │   ├── main.yaml               # Root nested stack
-│   │   ├── cognito.yaml            # UserPool + Groups + Client
-│   │   ├── iam.yaml                # ECS roles + optional SNS role
-│   │   ├── ecr.yaml                # Container registry
-│   │   ├── ecs.yaml                # Fargate service + ALB
-│   │   └── amplify.yaml            # Next.js hosting
-│   └── deploy.sh                   # One-command deploy script
 ├── .nvmrc                          # Node 20
 ├── turbo.json
 └── pnpm-workspace.yaml
@@ -172,35 +161,6 @@ pnpm dev
 
 ---
 
-## Deploy to AWS
-
-### Step 1 — Deploy infrastructure
-
-```bash
-bash infra/deploy.sh \
-  --env dev \
-  --region us-east-1 \
-  --vpc-id vpc-xxxxxxxx \
-  --subnet-ids "subnet-aaaa,subnet-bbbb" \
-  --github-repo "https://github.com/YOUR_USERNAME/cognito-rbac-mfa-starter" \
-  --github-token "ghp_xxxxxxxxxxxx"
-```
-
-The script deploys stacks in order:
-`IAM → ECR → Docker build+push → Cognito → ECS → Amplify`
-
-### Step 2 — Update environment variables
-
-Copy the stack outputs (printed at the end of the deploy) into your `.env` files:
-
-```
-COGNITO_USER_POOL_ID=us-east-1_xxxxxxxxx
-COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
-COGNITO_REGION=us-east-1
-```
-
----
-
 ## RBAC — How Roles Work
 
 Cognito automatically includes `cognito:groups` in every JWT:
@@ -270,8 +230,6 @@ Full interactive docs available at `http://localhost:4000/api/docs`
 | Frontend | Next.js 14 (App Router), Tailwind CSS, react-hook-form, zod |
 | Backend  | NestJS 10, Passport JWT, AWS SDK v3                         |
 | Auth     | AWS Cognito (User Pools + TOTP MFA)                         |
-| IaC      | AWS CloudFormation (nested stacks)                          |
-| Hosting  | AWS Amplify (web) + ECS Fargate + ALB (API)                 |
 | Monorepo | Turborepo + pnpm workspaces                                 |
 | Language | TypeScript (strict mode throughout)                         |
 
