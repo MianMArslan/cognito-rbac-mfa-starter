@@ -5,19 +5,17 @@ import {
   ListUsersCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { AuthenticatedUser, COGNITO_GROUPS, CognitoGroup, UserRole } from '@repo/shared-types';
-import { UserRepository } from '../../domain/interfaces/user-repository.abstract';
-import { UserGroupManager } from '../../../auth/domain/interfaces/user-group-manager.abstract';
+import { CognitoGroupManager } from '../auth/cognito-group.manager';
 
 @Injectable()
-export class CognitoUserRepository extends UserRepository {
+export class CognitoUserRepository {
   private readonly client: CognitoIdentityProviderClient;
   private readonly userPoolId: string;
 
   constructor(
     private readonly config: ConfigService,
-    private readonly groupManager: UserGroupManager,
+    private readonly groupManager: CognitoGroupManager,
   ) {
-    super();
     this.userPoolId = this.config.getOrThrow<string>('COGNITO_USER_POOL_ID');
     this.client = new CognitoIdentityProviderClient({
       region: this.config.getOrThrow<string>('COGNITO_REGION'),
@@ -29,7 +27,7 @@ export class CognitoUserRepository extends UserRepository {
       new ListUsersCommand({ UserPoolId: this.userPoolId }),
     );
 
-    const users = await Promise.all(
+    return Promise.all(
       (response.Users ?? []).map(async (u) => {
         const attrs = u.Attributes ?? [];
         const get = (name: string) => attrs.find((a) => a.Name === name)?.Value ?? '';
@@ -39,8 +37,6 @@ export class CognitoUserRepository extends UserRepository {
         return { sub: get('sub'), email: get('email'), username, role, groups };
       }),
     );
-
-    return users;
   }
 
   async assignGroup(username: string, group: CognitoGroup): Promise<void> {

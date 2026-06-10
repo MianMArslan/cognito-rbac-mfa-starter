@@ -27,7 +27,7 @@ A production-grade, full-stack starter kit for AWS Cognito authentication with *
 ┌─────────────────────────────────────────────────────────────────┐
 │            ALB  →  ECS Fargate (NestJS API :4000)               │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │  AuthModule   UsersModule   RolesModule   HealthController  │ │
+│  │  AuthModule   UsersModule   RolesModule   HealthController │ │
 │  │  (SOLID Clean Architecture — see below)                    │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └───────────────────────────┬─────────────────────────────────────┘
@@ -35,10 +35,10 @@ A production-grade, full-stack starter kit for AWS Cognito authentication with *
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    AWS Cognito User Pool                        │
-│  ┌──────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
-│  │  Admins  │  │   Clients    │  │  TOTP MFA (optional SMS)  │  │
-│  │ group    │  │   group      │  │  cognito:groups in JWT    │  │
-│  └──────────┘  └──────────────┘  └──────────────────────────┘  │
+│  ┌──────────┐  ┌──────────────┐  ┌──────────────────────────┐   │
+│  │  Admins  │  │   Clients    │  │  TOTP MFA (optional SMS) │   │
+│  │ group    │  │   group      │  │  cognito:groups in JWT   │   │
+│  └──────────┘  └──────────────┘  └──────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -46,17 +46,17 @@ A production-grade, full-stack starter kit for AWS Cognito authentication with *
 
 ## Features
 
-| Feature | Details |
-|---------|---------|
-| **Authentication** | Email + password via Cognito SRP |
-| **MFA** | TOTP (Google Authenticator, Authy) + optional SMS |
-| **RBAC** | Two roles — `Admin` and `Client` via Cognito Groups |
-| **JWT** | `cognito:groups` claim read directly — no Lambda needed |
-| **Session** | HTTP-only cookies (access, id, refresh tokens) |
-| **Frontend** | Next.js 14 App Router, middleware auth guard, role-gated pages |
-| **Backend** | NestJS with SOLID principles, Swagger docs at `/api/docs` |
-| **IaC** | CloudFormation nested stacks — Cognito, IAM, ECR, ECS, Amplify |
-| **Monorepo** | Turborepo with pnpm workspaces, shared types package |
+| Feature            | Details                                                        |
+| ------------------ | -------------------------------------------------------------- |
+| **Authentication** | Email + password via Cognito SRP                               |
+| **MFA**            | TOTP (Google Authenticator, Authy) + optional SMS              |
+| **RBAC**           | Two roles — `Admin` and `Client` via Cognito Groups            |
+| **JWT**            | `cognito:groups` claim read directly — no Lambda needed        |
+| **Session**        | HTTP-only cookies (access, id, refresh tokens)                 |
+| **Frontend**       | Next.js 14 App Router, middleware auth guard, role-gated pages |
+| **Backend**        | NestJS with SOLID principles, Swagger docs at `/api/docs`      |
+| **IaC**            | CloudFormation nested stacks — Cognito, IAM, ECR, ECS, Amplify |
+| **Monorepo**       | Turborepo with pnpm workspaces, shared types package           |
 
 ---
 
@@ -103,24 +103,31 @@ cognito-rbac-mfa-starter/
 ## SOLID Principles Applied
 
 ### Single Responsibility
+
 Each class has one job:
+
 - `LoginUseCase` — orchestrates login only
 - `CognitoAuthProviderImpl` — Cognito API calls only
 - `RolesGuard` — authorization checks only
 
 ### Open/Closed
+
 `CognitoAuthProvider` is an abstract class. Swap the Cognito implementation for any other provider (Auth0, Firebase) without touching `LoginUseCase` or any controller.
 
 ### Liskov Substitution
+
 `CognitoAuthProviderImpl`, `CognitoTokenVerifier`, and `CognitoUserGroupManager` fully satisfy their abstract contracts and are drop-in substitutable.
 
 ### Interface Segregation
+
 Three focused abstractions instead of one fat interface:
+
 - `TokenVerifier` — just `verify(token)`
 - `CognitoAuthProvider` — auth flows only
 - `UserGroupManager` — group management only
 
 ### Dependency Inversion
+
 Services depend on abstractions, never on concrete classes:
 
 ```typescript
@@ -237,20 +244,20 @@ To disable MFA: `POST /api/v1/auth/mfa/disable` (requires valid `accessToken`)
 
 ## API Endpoints
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `POST` | `/api/v1/auth/register` | — | Create account |
-| `POST` | `/api/v1/auth/login` | — | Sign in |
-| `POST` | `/api/v1/auth/refresh` | — | Refresh tokens |
-| `POST` | `/api/v1/auth/logout` | JWT | Revoke session |
-| `POST` | `/api/v1/auth/mfa/setup` | JWT | Start TOTP setup |
-| `POST` | `/api/v1/auth/mfa/verify-setup` | JWT | Activate MFA |
-| `POST` | `/api/v1/auth/mfa/challenge` | — | Verify MFA on login |
-| `POST` | `/api/v1/auth/mfa/disable` | JWT | Disable MFA |
-| `GET` | `/api/v1/users/me` | JWT | Current user |
-| `GET` | `/api/v1/users` | JWT + Admin | List all users |
-| `PATCH` | `/api/v1/users/:username/role` | JWT + Admin | Assign role |
-| `GET` | `/health` | — | Health check |
+| Method  | Path                            | Auth        | Description         |
+| ------- | ------------------------------- | ----------- | ------------------- |
+| `POST`  | `/api/v1/auth/register`         | —           | Create account      |
+| `POST`  | `/api/v1/auth/login`            | —           | Sign in             |
+| `POST`  | `/api/v1/auth/refresh`          | —           | Refresh tokens      |
+| `POST`  | `/api/v1/auth/logout`           | JWT         | Revoke session      |
+| `POST`  | `/api/v1/auth/mfa/setup`        | JWT         | Start TOTP setup    |
+| `POST`  | `/api/v1/auth/mfa/verify-setup` | JWT         | Activate MFA        |
+| `POST`  | `/api/v1/auth/mfa/challenge`    | —           | Verify MFA on login |
+| `POST`  | `/api/v1/auth/mfa/disable`      | JWT         | Disable MFA         |
+| `GET`   | `/api/v1/users/me`              | JWT         | Current user        |
+| `GET`   | `/api/v1/users`                 | JWT + Admin | List all users      |
+| `PATCH` | `/api/v1/users/:username/role`  | JWT + Admin | Assign role         |
+| `GET`   | `/health`                       | —           | Health check        |
 
 Full interactive docs available at `http://localhost:4000/api/docs`
 
@@ -258,15 +265,15 @@ Full interactive docs available at `http://localhost:4000/api/docs`
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
+| Layer    | Technology                                                  |
+| -------- | ----------------------------------------------------------- |
 | Frontend | Next.js 14 (App Router), Tailwind CSS, react-hook-form, zod |
-| Backend | NestJS 10, Passport JWT, AWS SDK v3 |
-| Auth | AWS Cognito (User Pools + TOTP MFA) |
-| IaC | AWS CloudFormation (nested stacks) |
-| Hosting | AWS Amplify (web) + ECS Fargate + ALB (API) |
-| Monorepo | Turborepo + pnpm workspaces |
-| Language | TypeScript (strict mode throughout) |
+| Backend  | NestJS 10, Passport JWT, AWS SDK v3                         |
+| Auth     | AWS Cognito (User Pools + TOTP MFA)                         |
+| IaC      | AWS CloudFormation (nested stacks)                          |
+| Hosting  | AWS Amplify (web) + ECS Fargate + ALB (API)                 |
+| Monorepo | Turborepo + pnpm workspaces                                 |
+| Language | TypeScript (strict mode throughout)                         |
 
 ---
 

@@ -7,15 +7,13 @@ import {
   AdminListGroupsForUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { CognitoGroup } from '@repo/shared-types';
-import { UserGroupManager } from '../../domain/interfaces/user-group-manager.abstract';
 
 @Injectable()
-export class CognitoUserGroupManager extends UserGroupManager {
+export class CognitoGroupManager {
   private readonly client: CognitoIdentityProviderClient;
   private readonly userPoolId: string;
 
   constructor(private readonly config: ConfigService) {
-    super();
     this.userPoolId = this.config.getOrThrow<string>('COGNITO_USER_POOL_ID');
     this.client = new CognitoIdentityProviderClient({
       region: this.config.getOrThrow<string>('COGNITO_REGION'),
@@ -49,7 +47,6 @@ export class CognitoUserGroupManager extends UserGroupManager {
         Username: username,
       }),
     );
-
     return (response.Groups ?? []).map((g) => g.GroupName as CognitoGroup);
   }
 }

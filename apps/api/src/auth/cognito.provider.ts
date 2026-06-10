@@ -17,17 +17,15 @@ import {
   ChallengeNameType,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { AuthTokens, MfaSetupResult } from '@repo/shared-types';
-import { CognitoAuthProvider } from '../../domain/interfaces/cognito-auth-provider.abstract';
 import * as crypto from 'crypto';
 
 @Injectable()
-export class CognitoAuthProviderImpl extends CognitoAuthProvider {
+export class CognitoProvider {
   private readonly client: CognitoIdentityProviderClient;
   private readonly clientId: string;
   private readonly clientSecret: string | undefined;
 
   constructor(private readonly config: ConfigService) {
-    super();
     this.clientId = this.config.getOrThrow<string>('COGNITO_CLIENT_ID');
     this.clientSecret = this.config.get<string>('COGNITO_CLIENT_SECRET');
     this.client = new CognitoIdentityProviderClient({
@@ -72,10 +70,7 @@ export class CognitoAuthProviderImpl extends CognitoAuthProvider {
     );
 
     if (response.ChallengeName === ChallengeNameType.SOFTWARE_TOKEN_MFA) {
-      return {
-        session: response.Session!,
-        challengeName: response.ChallengeName,
-      };
+      return { session: response.Session!, challengeName: response.ChallengeName };
     }
 
     if (!response.AuthenticationResult) {
@@ -101,14 +96,42 @@ export class CognitoAuthProviderImpl extends CognitoAuthProvider {
       throw new UnauthorizedException('Token refresh failed');
     }
 
-    return {
-      ...this.mapAuthResult(response.AuthenticationResult),
-      refreshToken,
-    };
+    return { ...this.mapAuthResult(response.AuthenticationResult), refreshToken };
   }
 
   async signOut(accessToken: string): Promise<void> {
     await this.client.send(new GlobalSignOutCommand({ AccessToken: accessToken }));
+  }
+
+  async confirmSignUp(email: string, code: string): Promise<void> {
+    await this.client.send(
+      new ConfirmSignUpCommand({
+        ClientId: this.clientId,
+        Username: email,
+        ConfirmationCode: code,
+        SecretHash: this.computeSecretHash(email),
+      }),
+    );
+  }
+
+  async resendConfirmationCode(email: string): Promise<void> {
+    await this.client.send(
+      new ResendConfirmationCodeCommand({
+        ClientId: this.clientId,
+        Username: email,
+        SecretHash: this.computeSecretHash(email),
+      }),
+    );
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    await this.client.send(
+      new ForgotPasswordCommand({
+        ClientId: this.clientId,
+        Username: email,
+        SecretHash: this.computeSecretHash(email),
+      }),
+    );
   }
 
   async associateSoftwareToken(accessToken: string): Promise<MfaSetupResult> {
@@ -125,21 +148,13 @@ export class CognitoAuthProviderImpl extends CognitoAuthProvider {
     const account = encodeURIComponent(user.email);
     const qrCodeUrl = `otpauth://totp/${issuer}:${account}?secret=${response.SecretCode}&issuer=${issuer}`;
 
-    return {
-      secretCode: response.SecretCode,
-      qrCodeUrl,
-      session: response.Session,
-    };
+    return { secretCode: response.SecretCode, qrCodeUrl, session: response.Session };
   }
 
   async verifySoftwareToken(accessToken: string, code: string): Promise<void> {
     await this.client.send(
-      new VerifySoftwareTokenCommand({
-        AccessToken: accessToken,
-        UserCode: code,
-      }),
+      new VerifySoftwareTokenCommand({ AccessToken: accessToken, UserCode: code }),
     );
-
     await this.client.send(
       new SetUserMFAPreferenceCommand({
         AccessToken: accessToken,
@@ -148,11 +163,7 @@ export class CognitoAuthProviderImpl extends CognitoAuthProvider {
     );
   }
 
-  async respondToMfaChallenge(
-    session: string,
-    username: string,
-    code: string,
-  ): Promise<AuthTokens> {
+  async respondToMfaChallenge(session: string, username: string, code: string): Promise<AuthTokens> {
     const response = await this.client.send(
       new RespondToAuthChallengeCommand({
         ClientId: this.clientId,
@@ -182,52 +193,13 @@ export class CognitoAuthProviderImpl extends CognitoAuthProvider {
     );
   }
 
-  async resendConfirmationCode(email: string): Promise<void> {
-    await this.client.send(
-      new ResendConfirmationCodeCommand({
-        ClientId: this.clientId,
-        Username: email,
-        SecretHash: this.computeSecretHash(email),
-      }),
-    );
-  }
-
-  async confirmSignUp(email: string, code: string): Promise<void> {
-    await this.client.send(
-      new ConfirmSignUpCommand({
-        ClientId: this.clientId,
-        Username: email,
-        ConfirmationCode: code,
-        SecretHash: this.computeSecretHash(email),
-      }),
-    );
-  }
-
-  async forgotPassword(email: string): Promise<void> {
-    await this.client.send(
-      new ForgotPasswordCommand({
-        ClientId: this.clientId,
-        Username: email,
-        SecretHash: this.computeSecretHash(email),
-      }),
-    );
-  }
-
-  async getUser(
-    accessToken: string,
-  ): Promise<{ sub: string; email: string; username: string }> {
+  async getUser(accessToken: string): Promise<{ sub: string; email: string; username: string }> {
     const response = await this.client.send(
       new GetUserCommand({ AccessToken: accessToken }),
     );
-
     const attrs = response.UserAttributes ?? [];
     const get = (name: string) => attrs.find((a) => a.Name === name)?.Value ?? '';
-
-    return {
-      sub: get('sub'),
-      email: get('email'),
-      username: response.Username ?? '',
-    };
+    return { sub: get('sub'), email: get('email'), username: response.Username ?? '' };
   }
 
   private mapAuthResult(result: {

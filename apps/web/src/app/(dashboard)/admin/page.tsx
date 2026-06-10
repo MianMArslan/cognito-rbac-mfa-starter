@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 export default function AdminPage() {
   const router = useRouter();
-  const { user, accessToken, isLoading } = useAuth();
+  const { user, idToken, isLoading } = useAuth();
   const [users, setUsers] = useState<AuthenticatedUser[]>([]);
 
   useEffect(() => {
@@ -21,14 +21,14 @@ export default function AdminPage() {
   }, [isLoading, user, router]);
 
   useEffect(() => {
-    if (!accessToken || !user || user.role !== 'ADMIN') return;
+    if (!idToken || !user || user.role !== 'ADMIN') return;
     fetch('/api/users', {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${idToken}` },
     })
       .then((r) => r.json())
       .then((d) => setUsers(d.data ?? []))
       .catch(() => {});
-  }, [accessToken, user]);
+  }, [idToken, user]);
 
   if (isLoading || !user || user.role !== 'ADMIN') return null;
 

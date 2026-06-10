@@ -1,11 +1,11 @@
 import { Controller, Get, Patch, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../auth/infrastructure/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../auth/infrastructure/guards/roles.guard';
-import { Roles } from '../../../roles/decorators/roles.decorator';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { UserRepository } from '../../domain/interfaces/user-repository.abstract';
-import { AssignRoleDto } from '../dtos/assign-role.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { UsersService } from './users.service';
+import { AssignRoleDto } from './dto/assign-role.dto';
 import { AuthenticatedUser, UserRole } from '@repo/shared-types';
 
 @ApiTags('users')
@@ -13,7 +13,7 @@ import { AuthenticatedUser, UserRole } from '@repo/shared-types';
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(private readonly users: UsersService) {}
 
   @Get('me')
   @ApiOperation({ summary: 'Get current authenticated user profile' })
@@ -26,7 +26,7 @@ export class UsersController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'List all users (Admin only)' })
   async listUsers() {
-    const users = await this.userRepository.findAll();
+    const users = await this.users.findAll();
     return { success: true, data: users };
   }
 
@@ -35,7 +35,7 @@ export class UsersController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Assign a user to a group/role (Admin only)' })
   async assignRole(@Param('username') username: string, @Body() dto: AssignRoleDto) {
-    await this.userRepository.assignGroup(username, dto.group);
+    await this.users.assignGroup(username, dto.group);
     return { success: true, message: `User ${username} assigned to ${dto.group}` };
   }
 }

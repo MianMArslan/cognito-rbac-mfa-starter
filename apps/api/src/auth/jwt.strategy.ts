@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthenticatedUser, COGNITO_GROUPS, CognitoJwtPayload, UserRole } from '@repo/shared-types';
 
 @Injectable()
-export class CognitoJwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(config: ConfigService) {
     const region = config.getOrThrow<string>('COGNITO_REGION');
     const userPoolId = config.getOrThrow<string>('COGNITO_USER_POOL_ID');

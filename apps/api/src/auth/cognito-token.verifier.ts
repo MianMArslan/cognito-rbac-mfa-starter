@@ -2,14 +2,12 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { CognitoJwtPayload } from '@repo/shared-types';
-import { TokenVerifier } from '../../domain/interfaces/token-verifier.abstract';
 
 @Injectable()
-export class CognitoTokenVerifier extends TokenVerifier {
+export class CognitoTokenVerifier {
   private readonly verifier: ReturnType<typeof CognitoJwtVerifier.create>;
 
   constructor(private readonly config: ConfigService) {
-    super();
     this.verifier = CognitoJwtVerifier.create({
       userPoolId: this.config.getOrThrow<string>('COGNITO_USER_POOL_ID'),
       tokenUse: 'id',

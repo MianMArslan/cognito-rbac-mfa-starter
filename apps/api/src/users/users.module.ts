@@ -1,15 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
-import { RolesModule } from '../roles/roles.module';
-import { UsersController } from './presentation/controllers/users.controller';
-import { CognitoUserRepository } from './infrastructure/repositories/cognito-user-repository';
-import { UserRepository } from './domain/interfaces/user-repository.abstract';
+import { UsersController } from './users.controller';
+import { UsersService } from './users.service';
+import { CognitoUserRepository } from './cognito-user.repository';
 
 @Module({
-  imports: [AuthModule, RolesModule],
+  imports: [AuthModule],
   controllers: [UsersController],
-  providers: [
-    { provide: UserRepository, useClass: CognitoUserRepository },
-  ],
+  providers: [UsersService, CognitoUserRepository],
 })
 export class UsersModule {}
