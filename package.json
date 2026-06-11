@@ -14,6 +14,7 @@
     "test": "turbo run test",
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml}\"",
+    "setup:cognito": "bash infra/deploy.sh",
     "seed:admin": "pnpm --filter @repo/api seed:admin"
   },
   "devDependencies": {

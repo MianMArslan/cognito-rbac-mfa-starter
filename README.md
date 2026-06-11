@@ -206,31 +206,86 @@ pnpm dev
 
 ### AWS Cognito Setup
 
-Before running the app, you need a Cognito User Pool. You can create one via the AWS Console or CLI.
+The project includes a CloudFormation template (`infra/cognito.yaml`) that provisions all required Cognito resources with a single command — no AWS Console clicking required.
 
-#### Required Cognito settings
+#### What gets created
 
-**1. User Pool — Sign-in options**
-- Enable **Email** as a sign-in option
+| Resource | Details |
+|----------|---------|
+| User Pool | Email sign-in, optional TOTP MFA, email verification, password policy |
+| App Client | With client secret, `USER_PASSWORD_AUTH` + `USER_SRP_AUTH` + `REFRESH_TOKEN_AUTH` |
+| Groups | `Admins` and `Clients` |
 
-**2. MFA**
-- Set MFA enforcement to **Optional** (required for the MFA toggle in settings to work)
-- Enable **Authenticator apps (TOTP)** as an MFA method
+#### Run it
 
-**3. App Client**
-- Create an app client **with a client secret**
-- Under **Authentication flows**, enable:
-  - `ALLOW_USER_PASSWORD_AUTH`
-  - `ALLOW_REFRESH_TOKEN_AUTH`
-  - `ALLOW_USER_SRP_AUTH`
+**1.** Add your AWS credentials to `apps/api/.env`:
 
-**4. User Pool Groups**
+```env
+AWS_ACCESS_KEY_ID=xxxxxxxxxxxxxxxxxxxx
+AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+AWS_REGION=us-east-1
+```
 
-Create two groups manually (or via the seeder):
-- `Admins`
-- `Clients`
+**2.** Deploy the stack:
 
-After creating the User Pool, copy the **User Pool ID**, **App Client ID**, and **App Client Secret** into `apps/api/.env`.
+```bash
+pnpm setup:cognito
+```
+
+This runs `infra/deploy.sh` which calls `aws cloudformation deploy` and waits for the stack to be ready.
+
+**3.** The script prints a ready-to-paste `.env` block when done:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Copy the following into apps/api/.env
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+COGNITO_REGION=us-east-1
+COGNITO_USER_POOL_ID=us-east-1_xxxxxxxxx
+COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+COGNITO_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+**Idempotent** — safe to re-run. CloudFormation only applies changes, existing resources are never duplicated.
+
+You can also deploy for a specific environment:
+
+```bash
+ENVIRONMENT=prod pnpm setup:cognito
+```
+
+#### Required IAM permissions
+
+The AWS user running the deploy needs these permissions:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "cloudformation:CreateStack",
+    "cloudformation:UpdateStack",
+    "cloudformation:DescribeStacks",
+    "cloudformation:DescribeStackEvents",
+    "cloudformation:CreateChangeSet",
+    "cloudformation:ExecuteChangeSet",
+    "cloudformation:DescribeChangeSet",
+    "cloudformation:GetTemplateSummary",
+    "cognito-idp:CreateUserPool",
+    "cognito-idp:DescribeUserPool",
+    "cognito-idp:UpdateUserPool",
+    "cognito-idp:CreateUserPoolClient",
+    "cognito-idp:DescribeUserPoolClient",
+    "cognito-idp:CreateGroup",
+    "cognito-idp:GetGroup",
+    "cognito-idp:AdminCreateUser",
+    "cognito-idp:AdminSetUserPassword",
+    "cognito-idp:AdminAddUserToGroup",
+    "cognito-idp:AdminGetUser"
+  ],
+  "Resource": "*"
+}
+```
 
 ---
 

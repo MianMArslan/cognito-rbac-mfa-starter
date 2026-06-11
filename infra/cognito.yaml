@@ -1,0 +1,150 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWS Cognito User Pool for cognito-rbac-mfa-starter.
+  Creates a User Pool, App Client (with secret), and Admins/Clients groups.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Parameters
+# ─────────────────────────────────────────────────────────────────────────────
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment — appended to resource names
+
+  PoolName:
+    Type: String
+    Default: CognitoRbacMfaStarterPool
+    Description: Base name for the Cognito User Pool
+
+  ClientName:
+    Type: String
+    Default: CognitoRbacMfaStarterClient
+    Description: Base name for the Cognito App Client
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Resources
+# ─────────────────────────────────────────────────────────────────────────────
+Resources:
+
+  # ── User Pool ──────────────────────────────────────────────────────────────
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${PoolName}-${Environment}'
+
+      # Sign in with email address
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+
+      # Require email re-verification before an email change takes effect
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+
+      # Password policy
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 7
+
+      # MFA — optional so users can enable it from Settings
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+
+      # Verification code (not a magic link)
+      VerificationMessageTemplate:
+        DefaultEmailOption: CONFIRM_WITH_CODE
+
+      # Account recovery via email only
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Priority: 1
+            Name: verified_email
+
+      # Prevent accidental deletion in dev — set to ACTIVE for production
+      DeletionProtection: INACTIVE
+
+      UserPoolTags:
+        Project: cognito-rbac-mfa-starter
+        Environment: !Ref Environment
+
+  # ── App Client ─────────────────────────────────────────────────────────────
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${ClientName}-${Environment}'
+      UserPoolId: !Ref UserPool
+
+      # Generate a client secret (required for server-side apps like NestJS)
+      GenerateSecret: true
+
+      # Auth flows required by this project
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH   # direct email + password login
+        - ALLOW_USER_SRP_AUTH        # SRP (more secure alternative to password auth)
+        - ALLOW_REFRESH_TOKEN_AUTH   # token refresh
+
+      # Token expiry
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+
+      # Invalidate tokens on sign-out
+      EnableTokenRevocation: true
+
+      # This is a server-side client — no OAuth/hosted UI needed
+      AllowedOAuthFlowsUserPoolClient: false
+
+  # ── Groups ─────────────────────────────────────────────────────────────────
+  AdminsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Admins
+      UserPoolId: !Ref UserPool
+      Description: Administrator users — full access including user management
+
+  ClientsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Clients
+      UserPoolId: !Ref UserPool
+      Description: Regular client users — standard access
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Outputs  (printed after deploy — copy into apps/api/.env)
+# ─────────────────────────────────────────────────────────────────────────────
+Outputs:
+  UserPoolId:
+    Description: COGNITO_USER_POOL_ID
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolId'
+
+  UserPoolClientId:
+    Description: COGNITO_CLIENT_ID
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolClientId'
+
+  UserPoolClientSecret:
+    Description: COGNITO_CLIENT_SECRET
+    Value: !GetAtt UserPoolClient.ClientSecret
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolClientSecret'
+
+  Region:
+    Description: COGNITO_REGION
+    Value: !Ref AWS::Region
