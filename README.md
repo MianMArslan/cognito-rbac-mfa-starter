@@ -13,7 +13,7 @@ A production-ready, full-stack authentication starter kit built on **AWS Cognito
   - [Architecture](#architecture)
   - [Repository Structure](#repository-structure)
   - [Prerequisites](#prerequisites)
-  - [Local Development Setup](#local-development-setup)
+  - [Running the Project](#running-the-project)
   - [AWS Cognito Setup](#aws-cognito-setup)
   - [Environment Variables](#environment-variables)
   - [Seeding an Admin User](#seeding-an-admin-user)
@@ -181,7 +181,7 @@ cognito-rbac-mfa-starter/
 
 ---
 
-### Local Development Setup
+### Running the Project
 
 ```bash
 # 1. Clone and install dependencies
@@ -189,17 +189,68 @@ git clone https://github.com/MianMArslan/cognito-rbac-mfa-starter
 cd cognito-rbac-mfa-starter
 nvm use
 pnpm install
+```
 
-# 2. Configure environment variables (see next section)
+**2. Set up AWS Cognito** — pick one path:
+
+#### Option A — Automated (no AWS Console required)
+
+If you do not want to manually configure Cognito through the AWS GUI, just add your AWS credentials to `infra/.env` and run the deploy script. It will provision the entire User Pool, App Client, and groups automatically via CloudFormation.
+
+```bash
+# Copy the example and fill in your credentials
+cp infra/.env.example infra/.env
+```
+
+Edit `infra/.env`:
+
+```env
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+REGION=us-east-1
+```
+
+Then deploy:
+
+```bash
+pnpm setup:cognito
+```
+
+The script prints the `COGNITO_*` values when done — copy them into `apps/api/.env`.
+
+To tear down the stack later:
+
+```bash
+bash infra/remove.sh
+```
+
+#### Option B — Manual (AWS Console)
+
+Create a Cognito User Pool manually with the settings described in the [AWS Cognito Setup](#aws-cognito-setup) section below, then copy the User Pool ID, Client ID, and Client Secret into `apps/api/.env`.
+
+---
+
+**3. Configure app environment variables:**
+
+```bash
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
-# Fill in your Cognito credentials in both files
+# Fill in your Cognito credentials in apps/api/.env
+```
 
-# 3. Start both apps in parallel
+**4. Start both apps:**
+
+```bash
 pnpm dev
 # API  → http://localhost:4000
 # Web  → http://localhost:3000
 # Docs → http://localhost:4000/api/docs  (Swagger)
+```
+
+**5. Seed your first admin user:**
+
+```bash
+ADMIN_EMAIL=admin@yoursite.com ADMIN_PASSWORD='Str0ng!Pass' pnpm seed:admin
 ```
 
 ---
@@ -218,12 +269,12 @@ The project includes a CloudFormation template (`infra/cognito.yaml`) that provi
 
 #### Run it
 
-**1.** Add your AWS credentials to `apps/api/.env`:
+**1.** Add your AWS credentials to `infra/.env` (copy from `infra/.env.example`):
 
 ```env
 AWS_ACCESS_KEY_ID=xxxxxxxxxxxxxxxxxxxx
 AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-AWS_REGION=us-east-1
+REGION=us-east-1
 ```
 
 **2.** Deploy the stack:
